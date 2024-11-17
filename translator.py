@@ -89,9 +89,6 @@ class SubtitleTranslator:
         return formatted_text
 
     def translate_subtitle_entry_chunk(self, entries: List[SubtitleEntry]) -> List[Tuple[int, str]]:
-        if not entries:
-            return []
-
         prompt = self._format_subtitle_entries(entries)
         try:
             response = self.client.chat.completions.create(
@@ -105,7 +102,9 @@ class SubtitleTranslator:
                 translations = json.loads(response.choices[0].message.content)
                 return [(t["index"], t["translation"]) for t in translations]
             except json.JSONDecodeError as e:
-                raise TranslationError(f"JSON解析失败: {str(e)}, 位置: {entries[0].index}")
+                # 一个chunk翻译失败, 保留原内容, 不必抛出异常
+                print(f"JSON解析失败: {str(e)}, 位置: {entries[0].index}")
+                return [(entry.index, entry.content) for entry in entries]
         except Exception as e:
             raise TranslationError(f"翻译失败: {str(e)}")
 
