@@ -60,26 +60,24 @@ class SrtParser:
 
 
 class SubtitleTranslator:
-    def __init__(self, api_key: str, model: str = "gpt-4-0125-preview", chunk_size: int = 10):
+    def __init__(self, api_key: str, model: str = "gpt-4o", chunk_size: int = 10):
         self.client = OpenAI(api_key=api_key)
         self.model = model
         self.chunk_size = chunk_size
-        self.system_prompt = """你是一个专业的字幕翻译员, 请将给定的英文字幕翻译成中文。
-要求：
-1. 保持专业、准确、自然的翻译风格
-2. 直接返回翻译结果，不要有任何解释
-3. 返回格式必须是 JSON 数组，每个元素包含原文索引(index)和翻译(translation)
-4. 翻译要简明扼要，符合中文表达习惯, 意译而非直译
-
-例如输入：
-3. Hello world
-4. How are you?
-
-应该输出：
-[
-    {"index": 3, "translation": "你好世界"},
-    {"index": 4, "translation": "你好吗？"}
-]"""
+        self.system_prompt = """请将给定的英文字幕翻译成流利的中文。翻译时请注意以下几点：
+        1. 翻译要优雅且富有文化，比如多用一些成语和词语
+        2. 翻译的时候应该去“意译”而非“直译”, 不要刻板翻译, 我不希望别人看出是机器翻译的
+        3. 必须严格按照以下JSON格式返回，不要添加任何其他内容
+        
+        例如输入：
+        3. Hello world
+        4. How are you?
+        
+        应该输出：
+        [
+            {"index": 3, "translation": "你好世界"},
+            {"index": 4, "translation": "你好吗？"}
+        ]"""
 
     @staticmethod
     def _format_subtitle_entries(entries: List[SubtitleEntry]) -> str:
@@ -87,6 +85,23 @@ class SubtitleTranslator:
         for entry in entries:
             formatted_text += f"{entry.index}. {entry.content.strip()}\n"
         return formatted_text
+
+    @staticmethod
+    def _clean_response(response: str) -> str:
+        # 移除开头和结尾的空白字符
+        cleaned = response.strip()
+
+        # 移除markdown标记
+        if cleaned.startswith('```'):
+            # 寻找第一个换行符，移除整个```json或```python等行
+            first_newline = cleaned.find('\n')
+            if first_newline != -1:
+                cleaned = cleaned[first_newline:].strip()
+            # 移除结尾的```
+            if cleaned.endswith('```'):
+                cleaned = cleaned[:-3].strip()
+
+        return cleaned
 
     def translate_subtitle_entry_chunk(self, entries: List[SubtitleEntry]) -> List[Tuple[int, str]]:
         prompt = self._format_subtitle_entries(entries)
@@ -98,12 +113,17 @@ class SubtitleTranslator:
                     {"role": "user", "content": prompt}
                 ]
             )
+            raw_response = response.choices[0].message.content
+            cleaned_response = self._clean_response(raw_response)
+            print(f"清理后的响应内容:\n{cleaned_response}")
+
             try:
-                translations = json.loads(response.choices[0].message.content)
+                translations = json.loads(cleaned_response)
                 return [(t["index"], t["translation"]) for t in translations]
-            except json.JSONDecodeError as e:
-                # 一个chunk翻译失败, 保留原内容, 不必抛出异常
-                print(f"JSON解析失败: {str(e)}, 位置: {entries[0].index}")
+            except (json.JSONDecodeError, KeyError) as e:
+                # 一个chunk翻译失败, 写入原内容, 不影响整体翻译, 继续翻译下一个chunk
+                print(f"解析失败: {str(e)}")
+                print(f"清理后的响应内容:\n{cleaned_response}")
                 return [(entry.index, entry.content) for entry in entries]
         except Exception as e:
             raise TranslationError(f"翻译失败: {str(e)}")
@@ -143,7 +163,7 @@ def main():
     try:
         translator = SubtitleTranslator(
             api_key=os.getenv("OPENAI_API_KEY"),
-            model="gpt-4-0125-preview",
+            model="gpt-4o",
             chunk_size=10
         )
         translator.translate_file(args.input, args.output)
