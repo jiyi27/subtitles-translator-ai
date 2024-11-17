@@ -2,6 +2,13 @@
 
 ## Installation
 
+Add the OpenAI API key to your .bashrc file in the root of your home folder (.zshrc if you use zsh).
+
+```bash
+export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
+```
+Then run the following command to install the required packages.
+
 ```bash
 pip install -r requirements.txt
 ```
