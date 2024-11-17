@@ -64,20 +64,39 @@ class SubtitleTranslator:
         self.client = OpenAI(api_key=api_key)
         self.model = model
         self.chunk_size = chunk_size
-        self.system_prompt = """请将给定的英文字幕翻译成流利的中文。翻译时请注意以下几点：
-        1. 翻译要优雅且富有文化，比如多用一些成语和词语
-        2. 翻译的时候应该去“意译”而非“直译”, 不要刻板翻译, 我不希望别人看出是机器翻译的
-        3. 必须严格按照以下JSON格式返回，不要添加任何其他内容
+        self.system_prompt = """
+        你是一个专业的中文翻译官, 按照以下要求翻译字幕:
+        1. 根据英文内容直译, 保持原有格式
+        2. 根据第一次直译的结果, 考虑上下文的语境进行重新意译，遵守原意的前提下让内容更通俗易懂
         
         例如输入：
-        3. Hello world
-        4. How are you?
+        3. We have thousands of friends on this.
+        4. incredible movement.
         
-        应该输出：
-        [
-            {"index": 3, "translation": "你好世界"},
-            {"index": 4, "translation": "你好吗？"}
-        ]"""
+        严格按照一下格式输出:
+        {
+          "literal": [
+            {
+              "index": 3,
+              "translation": "世界, 你好"
+            },
+            {
+              "index": 4,
+              "translation": "你好吗?"
+            }
+          ],
+          "free": [
+            {
+              "index": 3,
+              "translation": "你好吗? 世界"
+            },
+            {
+              "index": 4,
+              "translation": "最近过的怎么样?"
+            }
+          ]
+        }
+        """
 
     @staticmethod
     def _format_subtitle_entries(entries: List[SubtitleEntry]) -> str:
@@ -115,16 +134,13 @@ class SubtitleTranslator:
             )
             raw_response = response.choices[0].message.content
             cleaned_response = self._clean_response(raw_response)
-            print(f"清理后的响应内容:\n{cleaned_response}")
 
             try:
                 translations = json.loads(cleaned_response)
-                return [(t["index"], t["translation"]) for t in translations]
+                return [(t["index"], t["translation"]) for t in translations["free"]]
             except (json.JSONDecodeError, KeyError) as e:
-                # 一个chunk翻译失败, 写入原内容, 不影响整体翻译, 继续翻译下一个chunk
-                print(f"解析失败: {str(e)}")
-                print(f"清理后的响应内容:\n{cleaned_response}")
-                return [(entry.index, entry.content) for entry in entries]
+                # return [(entry.index, entry.content) for entry in entries]
+                raise TranslationError(f"解析响应失败, 请检查响应格式是否正确:\n{cleaned_response}\n" + str(e))
         except Exception as e:
             raise TranslationError(f"翻译失败: {str(e)}")
 
@@ -164,7 +180,7 @@ def main():
         translator = SubtitleTranslator(
             api_key=os.getenv("OPENAI_API_KEY"),
             model="gpt-4o",
-            chunk_size=10
+            chunk_size=20
         )
         translator.translate_file(args.input, args.output)
     except SubtitleError as e:
