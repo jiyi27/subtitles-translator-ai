@@ -67,7 +67,7 @@ class SubtitleTranslator:
         self.system_prompt = """
         你是一个专业的中文翻译官, 按照以下要求翻译字幕:
         1. 根据英文内容直译, 保持原有格式
-        2. 根据第一次直译的结果, 考虑上下文的语境进行重新意译，遵守原意的前提下让内容更通俗易懂
+        2. 根据第一次直译的结果, 考虑上下文的语境, 遵守原意的前提下进行重新意译
         
         例如输入：
         3. We have thousands of friends on this.
