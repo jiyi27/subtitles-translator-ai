@@ -65,9 +65,9 @@ class SubtitleTranslator:
         self.model = model
         self.chunk_size = chunk_size
         self.system_prompt = """
-        你是一个专业的中文翻译官, 按照以下要求翻译字幕:
+        你是一个专业的中文字幕翻译官, 按照以下要求翻译:
         1. 根据英文内容直译, 保持原有格式
-        2. 根据第一次直译的结果, 考虑上下文的语境, 遵守原意的前提下进行重新意译
+        2. 根据第一次直译的结果, 分析演说者前后说的话之间的联系和要表达的意思, 遵守原意的前提下进行重新意译
         
         例如输入：
         3. We have thousands of friends on this.
@@ -140,7 +140,8 @@ class SubtitleTranslator:
                 return [(t["index"], t["translation"]) for t in translations["free"]]
             except (json.JSONDecodeError, KeyError) as e:
                 # return [(entry.index, entry.content) for entry in entries]
-                raise TranslationError(f"解析响应失败, 请检查响应格式是否正确:\n{cleaned_response}\n" + str(e))
+                raise TranslationError(
+                    f"解析响应失败, 请检查响应格式是否正确:\n{cleaned_response}\n" + str(e))
         except Exception as e:
             raise TranslationError(f"翻译失败: {str(e)}")
 
@@ -172,8 +173,10 @@ class SubtitleTranslator:
 
 def main():
     parser = argparse.ArgumentParser(description='字幕翻译工具')
-    parser.add_argument('-i', '--input', required=True, help='输入的字幕文件路径 (例如: input.srt)')
-    parser.add_argument('-o', '--output', required=True, help='输出的翻译后字幕文件路径 (例如: output_zh.srt)')
+    parser.add_argument('-i', '--input', required=True,
+                        help='输入的字幕文件路径 (例如: input.srt)')
+    parser.add_argument('-o', '--output', required=True,
+                        help='输出的翻译后字幕文件路径 (例如: output_zh.srt)')
     args = parser.parse_args()
 
     try:
